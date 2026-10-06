@@ -733,73 +733,6 @@ function deleteAssessment(id){
 }
 function getAssessment(id){ return getAssessments().find(a=>a.id===id); }
 
-function seedIfEmpty(){
-  if (getAssessments().length>0) return;
-  const today = new Date().toISOString().slice(0,10);
-  /* Sample 1: João da Silva — HAS + depressão (fluoxetina + metoprolol) */
-  const p1 = uuid(), p2_id = uuid();
-  const m1 = uuid(), m2 = uuid();
-  const s1 = { ...emptyAssessment(),
-    service:{ consultReason:"Paciente busca a farmácia para revisão de medicação após início de fluoxetina pelo psiquiatra.",
-      reasonCategory:"queixa", accepted:true, acceptedDate:today, interviewDate:today, interviewMinutes:35,
-      pharmacistName:"", pharmacistCRF:"" },
-    patient:{ name:"João da Silva", recordNumber:"12345", birthDate:"1950-01-01", gender:"M", phone:"11999999999",
-      profession:"Aposentado (servidor público)", address:"São Paulo, SP", email:"" },
-    healthProblems:[
-      { id:p1, name:"Hipertensão Arterial (HAS)", startDate:"2018-06-01", controlled:"S", concern:"R", notes:"PA habitual 130-140/85" },
-      { id:p2_id, name:"Episódio depressivo maior", startDate:"2025-09-15", controlled:"N", concern:"M", notes:"Início recente de fluoxetina" }
-    ],
-    anthropometric:{ age:76, weight:80, height:175, egfr:55 },
-    cvProfile:{ ...emptyAssessment().cvProfile, riskFactors:{...emptyAssessment().cvProfile.riskFactors, has:true} },
-    medications:[
-      { id:m1, type:"ssri", drugId:"fluoxetina", name:"Fluoxetina", dose:"20mg", frequency:"1x/dia", route:"VO", indication:"Depressão",
-        stillUsing:true, prescriber:"Dr. Carlos (psiquiatra)", patientUnderstanding:"Para a tristeza e desânimo",
-        improving:"-", sinceDate:"2025-10-01", posology:"1-0-0", howTaken:"Manhã, em jejum",
-        untilWhen:"6 meses", difficulty:"", adverse:"Boca seca leve",
-        adherence:"M", knowledge:"R", linkedProblemIds:[p2_id] },
-      { id:m2, type:"cv", drugId:"metoprolol", name:"Metoprolol", dose:"50mg", frequency:"2x/dia", route:"VO", indication:"HAS",
-        stillUsing:true, prescriber:"Dr. Renato (cardiologista)", patientUnderstanding:"Para a pressão alta",
-        improving:"S", sinceDate:"2018-06-15", posology:"1-0-1", howTaken:"Após café e após jantar",
-        untilWhen:"Uso contínuo", difficulty:"", adverse:"Tontura ocasional ao levantar",
-        adherence:"M", knowledge:"M", linkedProblemIds:[p1] }
-    ]
-  };
-  /* Sample 2: Maria Oliveira — FA + depressão (paroxetina + varfarina + clopidogrel) */
-  const q1 = uuid(), q2 = uuid();
-  const n1 = uuid(), n2 = uuid(), n3 = uuid();
-  const s2 = { ...emptyAssessment(),
-    service:{ consultReason:"Paciente referida pela cardiologia para acompanhamento farmacoterapêutico após início de ISRS.",
-      reasonCategory:"medicamento", accepted:true, acceptedDate:today, interviewDate:today, interviewMinutes:42,
-      pharmacistName:"", pharmacistCRF:"" },
-    patient:{ name:"Maria Oliveira", recordNumber:"67890", birthDate:"1945-05-10", gender:"F", phone:"11888888888",
-      profession:"Aposentada (professora)", address:"Campinas, SP", email:"" },
-    healthProblems:[
-      { id:q1, name:"Fibrilação Atrial (FA)", startDate:"2020-03-20", controlled:"S", concern:"M", notes:"Em uso de anticoagulação plena" },
-      { id:q2, name:"Episódio depressivo", startDate:"2025-08-01", controlled:"N", concern:"M", notes:"Início de paroxetina há 1 mês" }
-    ],
-    anthropometric:{ age:81, weight:65, height:160, egfr:45 },
-    cvProfile:{ ...emptyAssessment().cvProfile, riskFactors:{...emptyAssessment().cvProfile.riskFactors, af:true}, cha2ds2vasc:4, hasBled:3 },
-    medications:[
-      { id:n1, type:"ssri", drugId:"paroxetina", name:"Paroxetina", dose:"20mg", frequency:"1x/dia", route:"VO", indication:"Depressão",
-        stillUsing:true, prescriber:"Dr. Lucas (psiquiatra)", patientUnderstanding:"Para o ânimo",
-        improving:"-", sinceDate:"2025-09-15", posology:"1-0-0", howTaken:"Manhã, com alimento",
-        untilWhen:"6 meses", difficulty:"", adverse:"",
-        adherence:"M", knowledge:"R", linkedProblemIds:[q2] },
-      { id:n2, type:"cv", drugId:"varfarina", name:"Varfarina", dose:"5mg", frequency:"1x/dia", route:"VO", indication:"FA",
-        stillUsing:true, prescriber:"Dra. Ana (cardiologista)", patientUnderstanding:"Para afinar o sangue",
-        improving:"S", sinceDate:"2020-04-01", posology:"0-0-1", howTaken:"Noite, longe de alimentos",
-        untilWhen:"Uso contínuo", difficulty:"", adverse:"Equimoses ocasionais",
-        adherence:"M", knowledge:"R", linkedProblemIds:[q1] },
-      { id:n3, type:"cv", drugId:"clopidogrel", name:"Clopidogrel", dose:"75mg", frequency:"1x/dia", route:"VO", indication:"Prevenção secundária",
-        stillUsing:true, prescriber:"Dra. Ana (cardiologista)", patientUnderstanding:"Para prevenir entupimento",
-        improving:"-", sinceDate:"2022-11-10", posology:"1-0-0", howTaken:"Manhã, com alimento",
-        untilWhen:"Uso contínuo", difficulty:"", adverse:"",
-        adherence:"M", knowledge:"P", linkedProblemIds:[q1] }
-    ]
-  };
-  saveAssessment(s1); saveAssessment(s2);
-}
-
 /* =====================================================================
    GRANADA PRM CLASSIFIER
    ===================================================================== */
@@ -3376,7 +3309,6 @@ function render(){
 }
 
 window.addEventListener('hashchange', render);
-seedIfEmpty();
 render();
 </script>
 </body>
