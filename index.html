@@ -3967,7 +3967,7 @@ function runTriagem(){
   if (tHas("digoxina")){
     // Tabela 7.2 da bula da digoxina (FDA): aumento da concentração sérica/AUC
     const DIG_MAIOR = { amiodarona:"~70%", propafenona:"60–270% (AUC)", verapamil:"50–75%", captopril:"58%" };
-    const DIG_MENOR = { diltiazem:"20%", nifedipino:"45%", espironolactona:"25%", carvedilol:"~15%", telmisartana:"20–49%", ticagrelor:"31%", atorvastatina:"22%", rabeprazol:"29%" };
+    const DIG_MENOR = { diltiazem:"20%", nifedipino:"45%", espironolactona:"25%", carvedilol:"~15%", telmisartana:"20–49%", ticagrelor:"31%", atorvastatina:"22%" };
     const digMaior = Object.keys(DIG_MAIOR).filter(tHas), digMenor = Object.keys(DIG_MENOR).filter(id=>tHas(id) && id!=="ticagrelor");
     if (digMaior.length) add(tHas("amiodarona")||tHas("propafenona")?"alto":"moderado","Interação",`Digoxina + ${tListar(digMaior)}`,
       `Aumento da concentração de digoxina acima de 50% (${digMaior.map(id=>triageNome(id)+": "+DIG_MAIOR[id]).join("; ")}), com risco de intoxicação digitálica.`,
@@ -3991,7 +3991,7 @@ function runTriagem(){
       "Bulas do carvedilol e do metoprolol");
     const ibpMg = ibp.length;
     if (ibpMg) add("baixo","Interação",`Digoxina + ${tListar(ibp)}`,
-      "O uso prolongado de IBP pode causar hipomagnesemia, que aumenta a toxicidade da digoxina; esomeprazol e rabeprazol também elevam a concentração de digoxina.",
+      "O uso prolongado de IBP pode causar hipomagnesemia, que aumenta a toxicidade da digoxina; além disso, rabeprazol (+29%), omeprazol, esomeprazol e lansoprazol (magnitude incerta) elevam a concentração de digoxina.",
       "Considerar dosar magnésio antes e periodicamente durante o uso prolongado do IBP.",
       "Bulas dos IBPs e da digoxina (FDA)");
     if (ind.length) add("moderado","Interação",`Digoxina + ${indTxt}`,
@@ -4234,6 +4234,233 @@ function runTriagem(){
       "A rifampicina reduz a exposição à losartana e ao seu metabólito ativo.",
       "Monitorar a PA.",
       "Bula da losartana");
+  }
+
+  /* ---------------- Acréscimos da varredura das bulas (FDA / ANVISA) ---------------- */
+  if (poupk.length>=2){
+    add("alto","Duplicidade",`${tListar(poupk)} simultâneos`,
+      "Dois poupadores de potássio: alto risco de hipercalemia grave.",
+      "A bula da amilorida orienta não associar a outros poupadores de potássio (ex.: espironolactona). Manter apenas um.",
+      "Bula da amilorida (FDA)");
+  }
+  if (poupk.length && aine.length){
+    add("moderado","Interação",`${tListar(poupk)} + ${tListar(aine)}`,
+      "AINE com poupador de potássio pode causar hipercalemia grave, além de reduzir o efeito diurético.",
+      "Evitar; se necessário, curto prazo com controle de potássio e creatinina.",
+      "Bulas da espironolactona/amilorida (FDA) e da nimesulida (ANVISA)");
+  }
+  if (alca.length && sraa.length){
+    add("baixo","Interação",`Furosemida + ${tListar(sraa)}`,
+      "A associação pode causar hipotensão importante e piora da função renal, sobretudo no início ou com depleção de volume.",
+      "Monitorar PA, creatinina e sinais de desidratação; ajustar o diurético se necessário.",
+      "Bula da furosemida (FDA)");
+  }
+  if (bb.length && aine.length){
+    add("baixo","Interação",`${tListar(aine)} + betabloqueador`,
+      "AINEs podem reduzir o efeito anti-hipertensivo dos betabloqueadores.",
+      "Monitorar a PA durante o uso do AINE.",
+      "Bulas dos AINEs e do propranolol (FDA); bula da nimesulida (ANVISA)");
+  }
+  const aineDig = aine.filter(id=>["ibuprofeno","diclofenaco","naproxeno","piroxicam","celecoxibe","meloxicam","nimesulida","cetoprofeno","tenoxicam","etoricoxibe"].includes(id));
+  const digIncerto = tSome(["metformina","sinvastatina"]).concat(aineDig.filter(id=>id!=="cetoprofeno"));
+  if (tHas("digoxina") && digIncerto.length){
+    add("baixo","Interação",`Digoxina + ${tListar(digIncerto)}`,
+      "As bulas relatam aumento da concentração de digoxina com esses fármacos (magnitude incerta).",
+      "Medir a digoxina sérica ao associar e monitorar sinais de toxicidade.",
+      "Bulas da digoxina, dos AINEs e da sinvastatina (FDA)");
+  }
+  if (cort.length && tHas("aas")){
+    add("baixo","Interação",`${tListar(cort)} + AAS`,
+      "Corticoide com AAS aumenta o risco de efeitos adversos gastrointestinais.",
+      "Usar o AAS com cautela; orientar sinais de sangramento." + gp,
+      "Bulas dos corticosteroides (FDA)");
+  }
+  if (cort.length && tHas("varfarina")){
+    add("baixo","Interação",`Varfarina + ${tListar(cort)}`,
+      "Corticoides podem reduzir (ou, às vezes, aumentar) a resposta à varfarina.",
+      "Monitorar INR com mais frequência ao iniciar, mudar ou suspender o corticoide.",
+      "Bulas dos corticosteroides e da varfarina (FDA)");
+  }
+  const warfCyp = tSome(["propranolol","anlodipino","verapamil","diltiazem","atorvastatina","pioglitazona"]);
+  if (tHas("varfarina") && warfCyp.length){
+    add("baixo","Interação",`Varfarina + ${tListar(warfCyp)}`,
+      "A bula da varfarina lista esses fármacos como inibidores ou indutores das enzimas que metabolizam a varfarina (o propranolol aumenta a concentração de varfarina).",
+      "Monitorar INR ao iniciar, ajustar ou suspender.",
+      "Bulas da varfarina e do propranolol (FDA)");
+  }
+  if (tHas("varfarina") && su.length){
+    add("baixo","Interação",`Varfarina + ${tListar(su)}`,
+      "Sulfonilureias podem aumentar o efeito anticoagulante (bula da gliclazida) e cumarínicos podem potencializar a hipoglicemia (bula da glimepirida).",
+      "Monitorar INR e glicemia ao iniciar ou ajustar.",
+      "Bulas do Diamicron® (ANVISA) e da glimepirida (FDA)");
+  }
+  if (tHas("nifedipino") && ndhp.length){
+    add("moderado","Interação",`Nifedipino + ${tListar(ndhp)}`,
+      "Verapamil e diltiazem inibem o CYP3A4 e aumentam a exposição ao nifedipino (o diltiazem aumentou a AUC em 2,2–3,1 vezes), com risco de hipotensão.",
+      "Monitorar PA e considerar redução da dose de nifedipino.",
+      "Bula do nifedipino (FDA)");
+  }
+  if (tHas("nifedipino") && tHas("fluoxetina")){
+    add("baixo","Interação","Nifedipino + fluoxetina",
+      "A fluoxetina pode aumentar a exposição ao nifedipino (inibição de CYP3A4).",
+      "Monitorar PA; considerar dose inicial menor de nifedipino.",
+      "Bula do nifedipino (FDA)");
+  }
+  if (tHas("nifedipino") && bb.length){
+    add("baixo","Interação",`Nifedipino + ${tListar(bb)}`,
+      "Hipotensão mais provável na associação (relatos de hipotensão grave e, raramente, IC com a forma de liberação imediata).",
+      "Monitorar PA, sobretudo no início.",
+      "Bulas do nifedipino e do timolol (FDA)");
+  }
+  if (tHas("verapamil") && tHas("aas")){
+    add("baixo","Interação","Verapamil + AAS",
+      "Há relatos de aumento do tempo de sangramento com a associação.",
+      "Orientar sinais de sangramento.",
+      "Bula do verapamil (FDA)");
+  }
+  const atorvaInib = tSome(["verapamil","amiodarona"]);
+  if (tHas("atorvastatina") && atorvaInib.length){
+    add("baixo","Interação",`Atorvastatina + ${tListar(atorvaInib)}`,
+      `${tListar(atorvaInib)} pode(m) aumentar a concentração de atorvastatina (substrato de CYP3A4).`,
+      "Podem ser necessárias doses iniciais e de manutenção menores de atorvastatina; atenção a sintomas musculares.",
+      "Bulas do verapamil e da amiodarona (FDA)");
+  }
+  if (tHas("amiodarona") && tHas("clonidina")){
+    add("moderado","Interação","Amiodarona + clonidina",
+      "A clonidina deprime o nó sinusal/AV e potencializa a bradicardia e o bloqueio AV da amiodarona.",
+      "Monitorar FC e ECG.",
+      "Bula da amiodarona (FDA)");
+  }
+  if (tHas("amiodarona") && tHas("dabigatrana")){
+    add("baixo","Interação","Amiodarona + dabigatrana",
+      "A amiodarona eleva a concentração de dabigatrana (a bula da dabigatrana não exige ajuste de dose).",
+      "Atenção a sinais de sangramento, sobretudo com disfunção renal.",
+      "Bulas da amiodarona e da dabigatrana (FDA)");
+  }
+  if (tHas("amiodarona") && tHas("clopidogrel")){
+    add("baixo","Interação","Amiodarona + clopidogrel",
+      "Possível redução da ativação do clopidogrel (CYP3A), com inibição plaquetária ineficaz.",
+      "Atenção à eficácia antiplaquetária; discutir com o prescritor se houver eventos.",
+      "Bula da amiodarona (FDA)");
+  }
+  if (tHas("amiodarona") && tHas("hiperico")){
+    add("moderado","Interação","Amiodarona + erva-de-são-joão",
+      "A erva-de-são-joão (indutora de CYP3A4) pode reduzir os níveis de amiodarona.",
+      "Evitar o fitoterápico; comunicar o prescritor.",
+      "Bula da amiodarona (FDA)");
+  }
+  if (tHas("propafenona") && tHas("amiodarona")){
+    add("alto","Interação","Propafenona + amiodarona",
+      "A bula da propafenona orienta evitar o uso com antiarrítmicos de classe IA e III, como a amiodarona (risco pró-arrítmico).",
+      "Evitar a associação; contatar o prescritor.",
+      "Bula da propafenona (FDA)");
+  }
+  if (tHas("propafenona") && tHas("rifampicina")){
+    add("moderado","Interação","Propafenona + rifampicina",
+      "A rifampicina reduziu as concentrações de propafenona em 50–67%, com risco de perda do controle do ritmo.",
+      "Monitorar ECG e resposta clínica; reajustar ao iniciar ou suspender a rifampicina.",
+      "Bulas da propafenona e da rifampicina (FDA)");
+  }
+  const bb2d6Prop = tSome(["carvedilol","nebivolol"]);
+  if (tHas("propafenona") && bb2d6Prop.length){
+    add("baixo","Interação",`Propafenona + ${tListar(bb2d6Prop)}`,
+      `A propafenona inibe o CYP2D6 e pode aumentar os níveis de ${tListar(bb2d6Prop)}.`,
+      "Usar com cautela; monitorar FC e PA.",
+      "Bulas do carvedilol e do nebivolol (FDA)");
+  }
+  if (tHas("clopidogrel") && tHas("rifampicina")){
+    add("moderado","Interação","Clopidogrel + rifampicina",
+      "A rifampicina induz fortemente o CYP2C19, aumentando o metabólito ativo do clopidogrel e o risco de sangramento.",
+      "A bula desaconselha a associação; discutir com o prescritor.",
+      "Bula da rifampicina (FDA)");
+  }
+  if (tHas("pitavastatina") && tHas("rifampicina")){
+    add("moderado","Interação","Pitavastatina + rifampicina",
+      "A rifampicina aumenta a exposição à pitavastatina (risco de miopatia).",
+      "A bula restringe a dose de pitavastatina com rifampicina (máx. 2 mg/dia).",
+      "Bula da pitavastatina (FDA)");
+  }
+  if (tHas("celecoxibe") && tHas("rifampicina")){
+    add("baixo","Interação","Celecoxibe + rifampicina",
+      "A rifampicina (indutora de CYP2C9) pode reduzir a eficácia do celecoxibe.",
+      "Avaliar a resposta analgésica.",
+      "Bula do celecoxibe (FDA)");
+  }
+  if (tHas("rifampicina") && tHas("enalapril")){
+    add("baixo","Interação","Enalapril + rifampicina",
+      "A rifampicina reduz a exposição ao metabólito ativo do enalapril.",
+      "Monitorar a PA.",
+      "Bula da rifampicina (FDA)");
+  }
+  const ibpInd2 = tSome(["lansoprazol","dexlansoprazol"]);
+  if (ibpInd2.length && ind.length){
+    add("moderado","Interação",`${tListar(ibpInd2)} + ${indTxt}`,
+      `${indTxt} reduz(em) a exposição ao IBP.`,
+      "A bula orienta evitar a associação.",
+      "Bulas do lansoprazol e do dexlansoprazol (FDA)");
+  }
+  const qtFlx = tSome(["sotalol","amiodarona"]);
+  if (tHas("fluoxetina") && qtFlx.length){
+    add("moderado","Interação",`Fluoxetina + ${tListar(qtFlx)}`,
+      "A bula da fluoxetina alerta para prolongamento do QT com antiarrítmicos de classe III (amiodarona, sotalol).",
+      "Usar com cautela; considerar ECG/QTc e correção de K+/Mg2+.",
+      "Bula da fluoxetina (FDA)");
+  }
+  // Controle glicêmico: fármacos que alteram o efeito de insulina/sulfonilureias
+  if (hipoglic.length){
+    const hipo = sraa.concat(tSome(["fluoxetina"]), aine.filter(id=>su.length));
+    if (hipo.length) add("baixo","Interação",`${tListar(hipoglic)} + ${tListar(hipo)}`,
+      "As bulas da insulina e das sulfonilureias listam IECA/BRA, fluoxetina e AINEs (com sulfonilureias) entre os fármacos que podem aumentar o risco de hipoglicemia.",
+      "Reforçar a automonitorização glicêmica ao iniciar ou ajustar; orientar sinais de hipoglicemia.",
+      "Bulas da insulina e da glimepirida (FDA); bula do Diamicron® (ANVISA)");
+    const hiper = tiaz.concat(tSome(["clonidina"]));
+    if (hiper.length) add("baixo","Interação",`${tListar(hipoglic)} + ${tListar(hiper)}`,
+      "Tiazídicos podem elevar a glicemia; a clonidina pode potencializar ou reduzir o efeito hipoglicemiante.",
+      "Monitorar glicemia; pode ser necessário ajustar a dose do antidiabético.",
+      "Bulas da hidroclorotiazida, clortalidona, insulina e glimepirida (FDA)");
+  }
+  if (tHas("metformina") && hipoglic.length){
+    add("baixo","Interação",`Metformina + ${tListar(hipoglic)}`,
+      "Risco aumentado de hipoglicemia na associação.",
+      "Pode ser necessária dose menor da insulina/sulfonilureia.",
+      "Bula da metformina (FDA)");
+  }
+  if (tHas("fluvastatina") && tHas("glibenclamida")){
+    add("baixo","Interação","Fluvastatina + glibenclamida",
+      "Interação farmacocinética descrita na bula da fluvastatina.",
+      "Monitorar glicemia ao iniciar a fluvastatina.",
+      "Bula da fluvastatina (FDA)");
+  }
+  // Fármacos sem bula FDA — bulas brasileiras
+  if (tHas("dipirona") && S.asmaDpoc){
+    add("baixo","Precaução","Dipirona em paciente com asma",
+      "A bula contraindica a dipirona em quem já teve broncoespasmo/reação anafilactoide com analgésicos e pede cautela na asma (risco de reação anafilática grave).",
+      "Perguntar sobre reação prévia a analgésicos/AINEs; se houver, não usar.",
+      "Bula da Novalgina® (ANVISA)");
+  }
+  if (tHas("dipirona") && (renalRed || hep)){
+    add("baixo","Dose × órgão","Dipirona em disfunção renal/hepática",
+      "A taxa de eliminação da dipirona é reduzida na insuficiência renal ou hepática.",
+      "Evitar doses altas repetidas; usar sob orientação médica.",
+      "Bula da Novalgina® (ANVISA)");
+  }
+  if (tHas("nimesulida") && (tHas("paracetamol") || tHas("rifampicina"))){
+    add("moderado","Interação",`Nimesulida + ${tListar(tSome(["paracetamol","rifampicina"]))}`,
+      "A bula orienta não usar nimesulida com fármacos potencialmente hepatotóxicos.",
+      "Evitar a associação; preferir analgésico sem hepatotoxicidade aditiva.",
+      "Bula do Nisulid® (ANVISA)");
+  }
+  if (tHas("vildagliptina") && hep){
+    add("moderado","Dose × órgão","Vildagliptina em disfunção hepática",
+      "A bula exige controle da função hepática (no início, a cada 3 meses no 1º ano e depois periodicamente); não reiniciar se suspensa por problema hepático.",
+      "Confirmar enzimas hepáticas antes de manter.",
+      "Bula do Galvus® (ANVISA)");
+  }
+  if (tHas("gliclazida") && S.gestante){
+    add("baixo","Gestação","Gliclazida na gestação",
+      "A bula não recomenda o uso na gravidez.",
+      "Encaminhar para troca por insulina.",
+      "Bula do Diamicron® (ANVISA)");
   }
 
   const ord = { alto:3, moderado:2, baixo:1 };
