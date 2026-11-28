@@ -851,6 +851,7 @@ function topbar(active){
   const items = [
     {h:"#/", t:"Início", k:"home"},
     {h:"#/triagem", t:"Triagem", k:"triagem"},
+    {h:"#/alergias", t:"Alergias", k:"alergia"},
     {h:"#/biblioteca", t:"Biblioteca", k:"lib"},
     {h:"#/matriz", t:"Matriz", k:"matrix"},
   ];
@@ -2641,6 +2642,7 @@ function renderLanding(){
       <a href="#/" class="lx-brand">${brandMark(30)} ${brandName()}</a>
       <div class="lx-links">
         <a href="#/triagem">Triagem</a>
+        <a href="#/alergias">Alergias</a>
         <a href="#/matriz">Matriz</a>
         <a href="#/biblioteca">Biblioteca</a>
       </div>
@@ -4729,6 +4731,413 @@ window.triageCopy = function(){
   else { toast("Não foi possível copiar"); }
 };
 
+/* =====================================================================
+   ALERGIAS — apoio à indicação quando o paciente relata alergia a um
+   medicamento: o que evitar, o que exige avaliação médica e qual opção é
+   mais segura. Cobre AINEs/analgésicos, betalactâmicos, sulfonamidas,
+   fluoroquinolonas e macrolídeos.
+   Fontes: AAAAI/ACAAI Drug Allergy Practice Parameter 2022 (Khan DA et al.,
+   J Allergy Clin Immunol 2022;150:1333-93) — declarações de consenso (CBS)
+   e tabelas XII, XIV, XVI, XVIII e XXI; classificação EAACI/ENDA (Kowalski ML
+   et al., Allergy 2013;68:1219-32); bulas brasileiras (Nisulid®, Novalgina®,
+   Celebra®). Ferramenta de APOIO: não substitui a avaliação do alergista.
+   ===================================================================== */
+const ALG_SRC = {
+  pp:    "AAAAI/ACAAI Drug Allergy Practice Parameter 2022 (Khan DA et al., J Allergy Clin Immunol 2022;150:1333-93)",
+  enda:  "Classificação EAACI/ENDA (Kowalski ML et al., Allergy 2013;68:1219-32)",
+  nisulid:  "Bula Nisulid® (nimesulida) — contraindicações",
+  novalgina:"Bula Novalgina® (dipirona) — contraindicações e sensibilidade cruzada",
+  celebra:  "Bula Celebra® (celecoxibe) — contraindicações",
+};
+
+// grupos químicos dos AINEs (AAAAI 2022, Tabela XXI; nimesulida, dipirona e paracetamol pela estrutura química)
+// cox: forte = inibe COX-1 de forma relevante | fraco | preferencial (COX-2, mas inibe COX-1 em dose maior) | seletivo (COX-2)
+const ALG_AINE_GRUPOS = {
+  salicilato:  "Salicilatos",
+  propionico:  "Derivados do ácido propiônico",
+  acetico:     "Derivados do ácido acético",
+  enolico:     "Ácidos enólicos (oxicans)",
+  fenamato:    "Fenamatos",
+  coxibe:      "Coxibes",
+  sulfonanilida:"Sulfonanilidas",
+  pirazolona:  "Pirazolonas",
+  paraaminofenol:"Para-aminofenóis",
+};
+const A_ = (id, nome, grupo, cox, extra) => Object.assign({ id, nome, fam:"aine", grupo, cox }, extra || {});
+const B_ = (id, nome, tipo, r1, extra) => Object.assign({ id, nome, fam:"betalac", tipo, r1 }, extra || {});
+const ALG_DRUGS = [
+  A_("aas","Ácido acetilsalicílico (AAS)","salicilato","forte"),
+  A_("ibuprofeno","Ibuprofeno","propionico","forte"),
+  A_("naproxeno","Naproxeno","propionico","forte"),
+  A_("cetoprofeno","Cetoprofeno","propionico","forte"),
+  A_("diclofenaco","Diclofenaco","acetico","forte"),
+  A_("aceclofenaco","Aceclofenaco","acetico","forte"),
+  A_("cetorolaco","Cetorolaco","acetico","forte"),
+  A_("indometacina","Indometacina","acetico","forte"),
+  A_("piroxicam","Piroxicam","enolico","forte"),
+  A_("tenoxicam","Tenoxicam","enolico","forte"),
+  A_("meloxicam","Meloxicam","enolico","preferencial"),
+  A_("mefenamico","Ácido mefenâmico","fenamato","forte"),
+  A_("nimesulida","Nimesulida","sulfonanilida","preferencial"),
+  A_("celecoxibe","Celecoxibe","coxibe","seletivo"),
+  A_("etoricoxibe","Etoricoxibe","coxibe","seletivo"),
+  A_("dipirona","Dipirona (metamizol)","pirazolona","pirazolona"),
+  A_("paracetamol","Paracetamol","paraaminofenol","fraco"),
+  // betalactâmicos — r1: grupos de cadeia lateral R1 idêntica (AAAAI 2022, Tabela XII)
+  B_("amoxicilina","Amoxicilina","penicilina","amoxi"),
+  B_("amoxiclav","Amoxicilina + clavulanato","penicilina","amoxi"),
+  B_("ampicilina","Ampicilina","penicilina","ampi"),
+  B_("penicilinag","Penicilina G (benzatina/cristalina)","penicilina",null),
+  B_("penicilinav","Penicilina V (fenoximetilpenicilina)","penicilina",null),
+  B_("oxacilina","Oxacilina","penicilina",null),
+  B_("piptazo","Piperacilina + tazobactam","penicilina",null),
+  B_("cefalexina","Cefalexina","cefalosporina","ampi"),
+  B_("cefadroxila","Cefadroxila","cefalosporina","amoxi"),
+  B_("cefaclor","Cefaclor","cefalosporina","ampi"),
+  B_("cefazolina","Cefazolina","cefalosporina",null),
+  B_("cefuroxima","Cefuroxima","cefalosporina",null),
+  B_("ceftriaxona","Ceftriaxona","cefalosporina","oxiimino"),
+  B_("cefotaxima","Cefotaxima","cefalosporina","oxiimino"),
+  B_("cefpodoxima","Cefpodoxima","cefalosporina","oxiimino"),
+  B_("cefepima","Cefepima","cefalosporina","oxiimino"),
+  B_("ceftazidima","Ceftazidima","cefalosporina","ceftaz"),
+  { id:"smxtmp", nome:"Sulfametoxazol + trimetoprima", fam:"sulfa" },
+  { id:"sulfadiazina", nome:"Sulfadiazina", fam:"sulfa" },
+  { id:"ciprofloxacino", nome:"Ciprofloxacino", fam:"fq" },
+  { id:"levofloxacino", nome:"Levofloxacino", fam:"fq" },
+  { id:"moxifloxacino", nome:"Moxifloxacino", fam:"fq" },
+  { id:"norfloxacino", nome:"Norfloxacino", fam:"fq" },
+  { id:"azitromicina", nome:"Azitromicina", fam:"macro" },
+  { id:"claritromicina", nome:"Claritromicina", fam:"macro" },
+  { id:"eritromicina", nome:"Eritromicina", fam:"macro" },
+];
+const ALG = Object.fromEntries(ALG_DRUGS.map(d=>[d.id,d]));
+const ALG_FAM = {
+  aine:   "AINEs e analgésicos",
+  betalac:"Betalactâmicos (penicilinas e cefalosporinas)",
+  sulfa:  "Sulfonamidas antibióticas",
+  fq:     "Fluoroquinolonas",
+  macro:  "Macrolídeos",
+};
+const ALG_R1_NOME = {
+  amoxi:"amoxicilina, cefadroxila e cefprozila",
+  ampi:"ampicilina, cefalexina e cefaclor",
+  oxiimino:"ceftriaxona, cefotaxima, cefpodoxima e cefepima",
+  ceftaz:"ceftazidima e aztreonam",
+};
+const ALG_REACOES = [
+  ["desconhecida","Não sabe descrever / não lembra"],
+  ["urticaria","Urticária e/ou inchaço (angioedema), sem falta de ar"],
+  ["anafilaxia","Anafilaxia: falta de ar, queda de pressão, desmaio ou inchaço de garganta"],
+  ["respiratoria","Crise de asma, chiado, coriza/congestão nasal após a dose"],
+  ["tardia","Manchas vermelhas na pele surgidas dias após o início, sem bolhas nem febre alta"],
+  ["grave","Reação grave tardia: bolhas, descolamento de pele, lesões em boca/olhos, febre com manchas (SSJ/NET, DRESS, PEGA)"],
+  ["intolerancia","Só náusea, diarreia, dor de estômago ou dor de cabeça"],
+];
+const ALG_EMPTY = () => ({ droga:"", reacao:"desconhecida", mais5:false, asmaPolipo:false, urticCronica:false, multiplos:false, necessidade:"dor" });
+let algState = ALG_EMPTY();
+
+function algNomes(ids){ return ids.map(id=>ALG[id].nome).join(", "); }
+
+function runAlergia(){
+  const S = algState, d = ALG[S.droga];
+  const R = { fenotipo:null, evitar:[], avaliar:[], opcoes:[], encaminhar:[], alarme:false };
+  if (!d) return R;
+  const ev = (titulo, detalhe, fonte) => R.evitar.push({ titulo, detalhe, fonte });
+  const av = (titulo, detalhe, fonte) => R.avaliar.push({ titulo, detalhe, fonte });
+  const op = (titulo, detalhe, fonte) => R.opcoes.push({ titulo, detalhe, fonte });
+  const en = (txt) => R.encaminhar.push(txt);
+  const r = S.reacao;
+  const grave = r === "grave";
+  const imediataGrave = r === "anafilaxia" || r === "respiratoria";
+  if (grave || imediataGrave) R.alarme = true;
+
+  if (r === "intolerancia"){
+    R.fenotipo = { titulo:"História pouco compatível com alergia", texto:"Náusea, diarreia, dor de estômago ou dor de cabeça isoladas são efeitos adversos, não reação alérgica. A AAAAI recomenda não testar pacientes com história incompatível com alergia (ex.: cefaleia, diarreia, história familiar) — CBS 5, para penicilina.", fonte:ALG_SRC.pp };
+    en("Registrar como intolerância/efeito adverso (não como alergia) e conversar com o prescritor sobre a retirada do rótulo de alergia.");
+    if (d.fam === "aine") op("Analgésico conforme a necessidade", "Sem restrição alérgica. Escolha o analgésico pelo perfil do paciente (função renal, risco gastrointestinal, interações) e evite repetir o fármaco que causou o desconforto, se possível.", ALG_SRC.pp);
+    return R;
+  }
+
+  /* ---------------- AINEs e analgésicos ---------------- */
+  if (d.fam === "aine"){
+    const aines = ALG_DRUGS.filter(x=>x.fam==="aine");
+    const mesmoGrupo = aines.filter(x=>x.grupo===d.grupo).map(x=>x.id);
+    const grupoNome = ALG_AINE_GRUPOS[d.grupo];
+
+    // fenótipo (AAAAI 2022, Tabela XVI; EAACI/ENDA)
+    let cruzada;
+    if (grave){
+      cruzada = false;
+      R.fenotipo = { titulo:"Reação tardia grave (SSJ/NET, DRESS ou PEGA)", texto:`Reação mediada por linfócitos T. A AAAAI recomenda evitar o fármaco e o mesmo grupo químico (${grupoNome}) sem nova exposição, porque a recorrência não pode ser prevista pelos testes atuais; reações graves contraindicam teste de provocação.`, fonte:ALG_SRC.pp };
+    } else if (r === "tardia"){
+      cruzada = false;
+      R.fenotipo = { titulo:"Provável reação tardia benigna a um AINE (seletiva)", texto:`Reações tardias a AINEs são em geral mediadas por linfócitos T. Há reatividade cruzada dentro do mesmo grupo químico (${grupoNome}), embora não universal.`, fonte:ALG_SRC.pp };
+    } else if (r === "respiratoria" || S.asmaPolipo){
+      cruzada = true;
+      R.fenotipo = { titulo:"Provável doença respiratória exacerbada por AINEs (DREA / N-ERD / AERD)", texto:"Reação por inibição da COX-1, não alérgica nem específica do fármaco: todos os AINEs que inibem a COX-1 podem desencadear crise. É comum em asma com rinossinusite crônica e pólipos nasais (cerca de 1/3 desses pacientes).", fonte:ALG_SRC.pp + " · " + ALG_SRC.enda };
+    } else if (S.urticCronica){
+      cruzada = true;
+      R.fenotipo = { titulo:"Provável doença cutânea exacerbada por AINEs (NECD)", texto:"Em urticária crônica espontânea, 10% a 40% dos pacientes pioram com AAS ou AINEs. Todos os inibidores da COX-1 reagem de forma cruzada.", fonte:ALG_SRC.pp };
+    } else if (S.multiplos){
+      cruzada = true;
+      R.fenotipo = { titulo:"Provável urticária/angioedema induzida por múltiplos AINEs (NIUA)", texto:"Reagir a AINEs de grupos químicos diferentes indica reação cruzada por inibição da COX-1. As reações costumam ser só cutâneas.", fonte:ALG_SRC.pp + " · " + ALG_SRC.enda };
+    } else if (r === "anafilaxia"){
+      cruzada = false;
+      R.fenotipo = { titulo:"Provável reação seletiva a um AINE (SNIUAA)", texto:"Anafilaxia é muito improvável no padrão cruzado (NIUA), o que sugere reação específica ao fármaco ou ao grupo químico. Mesmo assim, só o alergista confirma quais AINEs de outros grupos são tolerados.", fonte:ALG_SRC.pp };
+    } else {
+      cruzada = null; // urticária isolada ou não sabe: indefinido
+      R.fenotipo = { titulo:"Fenótipo indefinido: reação cruzada (NIUA) ou seletiva (SNIUAA)", texto:"Com uma reação a um único AINE, só o teste de provocação oral com AAS distingue reação cruzada de reação seletiva (CBS 26). Até essa avaliação, a conduta mais prudente é tratar como reação cruzada e evitar todos os inibidores da COX-1.", fonte:ALG_SRC.pp };
+    }
+    const tratarCruzada = cruzada !== false; // indefinido → conduta conservadora (tratar como cruzada)
+
+    ev(d.nome + " (fármaco suspeito)", "Não reexpor sem avaliação do alergista.", ALG_SRC.pp);
+    const outrosGrupo = mesmoGrupo.filter(id=>id!==d.id);
+    if (outrosGrupo.length) ev("Mesmo grupo químico: " + grupoNome, algNomes(outrosGrupo) + ". Reatividade cruzada estrutural esperada" + (grave ? "; após reação grave, evitar em definitivo." : "."), ALG_SRC.pp);
+    if (d.id === "dipirona") ev("Outras pirazolonas e pirazolidinas", "Fenazona, propifenazona, isopropilaminofenazona, fenilbutazona e oxifembutazona: contraindicadas na alergia à dipirona.", ALG_SRC.novalgina);
+
+    if (tratarCruzada && !grave){
+      const fortes = aines.filter(x=>(x.cox==="forte") && x.grupo!==d.grupo).map(x=>x.id);
+      ev("AINEs inibidores da COX-1 (todos os grupos)", algNomes(fortes) + ". Inclui formas tópicas (gel de diclofenaco ou cetoprofeno), que a AAAAI lista entre os inibidores da COX-1.", ALG_SRC.pp);
+      const pref = aines.filter(x=>x.cox==="preferencial" && x.grupo!==d.grupo).map(x=>x.id);
+      if (pref.length) ev("Inibidores preferenciais da COX-2", algNomes(pref) + ". Inibem a COX-1 em doses maiores e podem causar reação conforme a dose." + (pref.includes("nimesulida") ? " A bula da nimesulida contraindica o uso em quem teve broncoespasmo, rinite, urticária ou angioedema com AAS ou outros AINEs." : ""), ALG_SRC.pp + (pref.includes("nimesulida") ? " · " + ALG_SRC.nisulid : ""));
+      if (d.id !== "dipirona") ev("Dipirona", "A bula contraindica a dipirona em quem teve broncoespasmo, urticária, rinite ou angioedema após analgésicos como salicilatos, paracetamol, diclofenaco, ibuprofeno, indometacina ou naproxeno.", ALG_SRC.novalgina);
+    }
+    if (grave){
+      av("Demais AINEs e analgésicos de outros grupos", "Após reação tardia grave, qualquer novo analgésico deve ser decidido com o médico. Os grupos diferentes do suspeito não têm reatividade cruzada estrutural esperada, mas não há teste que preveja recorrência.", ALG_SRC.pp);
+    } else if (!tratarCruzada){
+      av("AINEs de outros grupos químicos", "Na reação seletiva, AINEs de grupos estruturais diferentes costumam ser tolerados, mas a AAAAI orienta confirmar com teste de provocação feito pelo alergista antes do uso. Não indicar por conta própria.", ALG_SRC.pp);
+    }
+
+    // coxibes como alternativa (CBS 22) × bula brasileira
+    if (d.grupo !== "coxibe" && !grave){
+      av("Coxibes (celecoxibe, etoricoxibe) — só com prescrição e avaliação médica",
+        "A AAAAI sugere um inibidor seletivo da COX-2 como alternativa em qualquer fenótipo de hipersensibilidade a AINEs quando um AINE é necessário (CBS 22, recomendação condicional, evidência baixa). Reações são extremamente raras na DREA, mas ocorrem em 8% a 11% na NIUA, por isso a 1ª dose deve ser feita sob observação. Atenção: a bula brasileira do Celebra® contraindica o uso em quem teve asma, urticária ou reação alérgica após AAS ou outros anti-inflamatórios — a decisão é do prescritor/alergista.",
+        ALG_SRC.pp + " · " + ALG_SRC.celebra);
+    }
+
+    // paracetamol
+    if (d.id === "paracetamol"){
+      en(tratarCruzada
+        ? "Não há analgésico de venda livre que possa ser indicado com segurança sem avaliação: uma reação cruzada ao paracetamol, que inibe pouco a COX-1, sugere alta sensibilidade aos inibidores da COX-1. Encaminhar ao médico/alergista."
+        : "Sem alternativa de venda livre confirmada: outros analgésicos devem ser escolhidos com o médico/alergista.");
+    } else if (grave){
+      av("Paracetamol", "Grupo químico diferente, mas após reação tardia grave a escolha deve ser feita com o médico. Observação da AAAAI: paracetamol e ibuprofeno às vezes são falsamente implicados em SSJ/NET por serem usados nos sintomas iniciais da doença.", ALG_SRC.pp);
+    } else {
+      const extra = d.id === "dipirona" ? " A bula da Novalgina® alerta que quem reagiu à dipirona pode ter risco especial com outros analgésicos não narcóticos: oriente bem e prefira a 1ª dose com supervisão." : "";
+      const anaf = r === "anafilaxia" ? " Após anafilaxia, combine a 1ª dose com o médico." : "";
+      op(S.necessidade === "febre" ? "Paracetamol para febre" : S.necessidade === "inflamacao" ? "Paracetamol para a dor associada" : "Paracetamol para dor",
+        "Inibidor fraco da COX-1, em geral tolerado. Segundo a AAAAI, pode causar reação em pacientes muito sensíveis em doses mais altas (650–1.000 mg), em geral leve. Por prudência, prefira doses isoladas de até 500 mg e oriente sobre sinais de reação." + extra + anaf + (S.necessidade === "inflamacao" ? " Atenção: o paracetamol é analgésico e antitérmico, sem efeito anti-inflamatório relevante." : ""),
+        ALG_SRC.pp + (d.id === "dipirona" ? " · " + ALG_SRC.novalgina : ""));
+    }
+    if (S.necessidade === "inflamacao"){
+      op("Medidas não farmacológicas de suporte", "Em dor inflamatória musculoesquelética: compressa fria, repouso relativo e elevação do membro, enquanto se aguarda a avaliação médica. Não substituem o tratamento quando há inflamação importante.", "Medidas gerais");
+      en("Se o processo inflamatório exigir anti-inflamatório, encaminhar ao médico: coxibe sob observação, corticoide ou outra conduta dependem de prescrição.");
+    }
+    if (d.id === "aas") en("Se o paciente precisa de AAS para prevenção cardiovascular, o cardiologista e o alergista podem fazer provocação graduada ou dessensibilização (CBS 25 e 27). Não suspender nem trocar por conta própria.");
+    if (cruzada !== false && !grave) en("Encaminhar ao alergista para definir o fenótipo (teste de provocação oral com AAS — CBS 26) e testar alternativas.");
+    else en("Encaminhar ao alergista para confirmar o fármaco responsável e as alternativas toleradas.");
+    return R;
+  }
+
+  /* ---------------- Betalactâmicos ---------------- */
+  if (d.fam === "betalac"){
+    const pens = ALG_DRUGS.filter(x=>x.tipo==="penicilina").map(x=>x.id);
+    const cefs = ALG_DRUGS.filter(x=>x.tipo==="cefalosporina").map(x=>x.id);
+    const mesmoR1 = d.r1 ? ALG_DRUGS.filter(x=>x.fam==="betalac" && x.r1===d.r1 && x.id!==d.id).map(x=>x.id) : [];
+    const anaf = imediataGrave || r === "desconhecida";
+    if (grave){
+      R.fenotipo = { titulo:"Reação tardia grave a betalactâmico", texto:"SSJ/NET, DRESS e PEGA contraindicam teste de provocação. A liberação de carbapenêmicos sem teste (CBS 17) vale apenas quando a reação não foi cutânea grave tardia ou com acometimento de órgãos.", fonte:ALG_SRC.pp };
+      ev("Todos os betalactâmicos", "Penicilinas, cefalosporinas e carbapenêmicos: evitar até avaliação especializada.", ALG_SRC.pp);
+      en("Encaminhar ao médico/alergista. O antibiótico alternativo é decisão do prescritor.");
+      return R;
+    }
+    if (d.tipo === "penicilina"){
+      R.fenotipo = anaf
+        ? { titulo: r === "desconhecida" ? "Alergia a penicilina de tipo desconhecido" : "Reação imediata grave a penicilina", texto:"Na dúvida, a conduta segura é a da anafilaxia: evitar penicilinas e cefalosporinas com a mesma cadeia lateral R1. O risco de reação cruzada vem da cadeia R1, não do anel betalactâmico.", fonte:ALG_SRC.pp }
+        : { titulo:"Alergia a penicilina não anafilática", texto:"Urticária ou exantema benigno. Cefalosporinas podem ser administradas sem teste (CBS 13).", fonte:ALG_SRC.pp };
+      ev("Penicilinas", algNomes(pens) + ". Evitar até avaliação; muitos pacientes perdem a alergia e podem ter o rótulo retirado (CBS 4).", ALG_SRC.pp);
+      if (anaf){
+        if (mesmoR1.length) ev("Cefalosporinas com cadeia R1 idêntica", algNomes(mesmoR1.filter(id=>ALG[id].tipo==="cefalosporina")) + `. Grupo R1 de ${ALG_R1_NOME[d.r1]}. Em alérgicos confirmados (sobretudo a aminopenicilinas), a reatividade cruzada nos testes cutâneos foi de 16,45% com as aminocefalosporinas.`, ALG_SRC.pp + " (Tabela XII)");
+        op("Cefalosporina com cadeia R1 diferente (decisão do prescritor)", "Pode ser administrada sem teste nem precauções adicionais, mesmo após anafilaxia a penicilina (CBS 12). Exemplos de baixa semelhança: cefazolina, cefpodoxima, ceftriaxona, ceftazidima e cefepima — reatividade cruzada de 2,11%." + (d.r1 ? "" : " Para penicilina G/V, oxacilina e piperacilina, as aminocefalosporinas também não compartilham R1."), ALG_SRC.pp);
+        en("Encaminhar ao alergista: teste cutâneo para penicilina é sugerido após anafilaxia ou reação recente de mecanismo IgE (CBS 6).");
+      } else {
+        op("Cefalosporinas (decisão do prescritor)", "Podem ser administradas sem teste nem precauções adicionais na alergia não anafilática a penicilina (CBS 13).", ALG_SRC.pp);
+        if (S.mais5) en("Reação cutânea benigna há mais de 5 anos: candidato a provocação direta com amoxicilina para retirar o rótulo (CBS 9). Encaminhar ao médico/alergista.");
+        else en("Encaminhar ao alergista para avaliar a retirada do rótulo de alergia (CBS 4).");
+      }
+      op("Carbapenêmicos e aztreonam (uso hospitalar)", "Carbapenêmicos podem ser administrados sem teste (CBS 17). Aztreonam também, exceto se houver alergia à ceftazidima (CBS 18).", ALG_SRC.pp);
+      return R;
+    }
+    // cefalosporina
+    R.fenotipo = anaf
+      ? { titulo: r === "desconhecida" ? "Alergia a cefalosporina de tipo desconhecido" : "Reação imediata grave a cefalosporina", texto:"Na dúvida, adote a conduta da anafilaxia. A reatividade cruzada depende da cadeia lateral R1.", fonte:ALG_SRC.pp }
+      : { titulo:"Alergia a cefalosporina não anafilática", texto:"Penicilinas podem ser administradas sem teste (CBS 14) — por exemplo, quem teve urticária com cefalexina pode receber amoxicilina.", fonte:ALG_SRC.pp };
+    ev(d.nome + " (fármaco suspeito)", "Evitar até avaliação.", ALG_SRC.pp);
+    if (mesmoR1.length) ev("Betalactâmicos com cadeia R1 idêntica", algNomes(mesmoR1) + `. Grupo R1 de ${ALG_R1_NOME[d.r1]}.` + (d.r1 === "oxiimino" ? " (cefepima compartilha a mesma cadeia aminotiazolil-metoxi-imino)." : ""), ALG_SRC.pp + " (Tabela XII)");
+    if (anaf){
+      av("Penicilinas", "Após anafilaxia a cefalosporina, a AAAAI sugere teste cutâneo para penicilina e provocação antes de usar penicilina.", ALG_SRC.pp);
+      av("Outras cefalosporinas (R1 diferente)", "Após anafilaxia, confirmar teste cutâneo negativo para a cefalosporina antes de usar outra cefalosporina parenteral de R1 não idêntica (CBS 11).", ALG_SRC.pp);
+    } else {
+      op("Penicilinas (decisão do prescritor)", "Podem ser administradas sem teste nem precauções adicionais (CBS 14)." + (mesmoR1.some(id=>ALG[id].tipo==="penicilina") ? " Por cautela (conduta conservadora, não é recomendação da AAAAI), evite a penicilina de cadeia R1 idêntica listada acima." : ""), ALG_SRC.pp);
+      av("Outras cefalosporinas (R1 diferente)", "A AAAAI sugere provocação direta, sem teste cutâneo prévio, com cefalosporina de cadeia R1 diferente para confirmar tolerância (CBS 10).", ALG_SRC.pp);
+    }
+    op("Carbapenêmicos e aztreonam (uso hospitalar)", "Carbapenêmicos podem ser administrados sem teste (CBS 17). Aztreonam também" + (d.id === "ceftazidima" ? ", mas NÃO na alergia à ceftazidima, que compartilha a cadeia R1 (CBS 18)." : ", exceto se houver alergia à ceftazidima (CBS 18)."), ALG_SRC.pp);
+    en("Encaminhar ao alergista para confirmar a alergia e as alternativas.");
+    return R;
+  }
+
+  /* ---------------- Sulfonamidas antibióticas ---------------- */
+  if (d.fam === "sulfa"){
+    R.fenotipo = { titulo:"Alergia a sulfonamida antibiótica", texto:"As sulfonamidas antibióticas têm um grupo amina aromático na posição N4 que as não antibióticas não têm; por isso a reatividade cruzada com sulfonamidas não antimicrobianas é improvável.", fonte:ALG_SRC.pp };
+    ev("Sulfonamidas antibióticas", "Sulfametoxazol + trimetoprima e sulfadiazina." + (grave ? " Após reação grave, evitar em definitivo." : ""), ALG_SRC.pp);
+    const naoAnti = "Furosemida, bumetanida, hidroclorotiazida, clortalidona, indapamida, glibenclamida, glimepirida, gliclazida, celecoxibe, acetazolamida, dorzolamida, topiramato, sumatriptana, sotalol, tansulosina e a sulfona dapsona.";
+    if (grave) av("Sulfonamidas não antimicrobianas", naoAnti + " A AAAAI considera mínima a preocupação de reatividade cruzada, mas após reação grave confirme a conduta com o prescritor.", ALG_SRC.pp + " (Tabela XIV)");
+    else op("Sulfonamidas não antimicrobianas podem ser usadas", naoAnti + " Reatividade cruzada improvável.", ALG_SRC.pp + " (Tabela XIV)");
+    if (!grave && S.mais5 && (r === "urticaria" || r === "tardia")) en("Reação cutânea benigna há mais de 5 anos: a AAAAI sugere provocação em 1 etapa com sulfametoxazol + trimetoprima quando for preciso retirar o rótulo (CBS 20). Encaminhar ao médico.");
+    else en("Encaminhar ao médico/alergista se o antibiótico for necessário.");
+    return R;
+  }
+
+  /* ---------------- Fluoroquinolonas ---------------- */
+  if (d.fam === "fq"){
+    const fqs = ALG_DRUGS.filter(x=>x.fam==="fq").map(x=>x.id);
+    if (grave){
+      R.fenotipo = { titulo:"Reação tardia grave a fluoroquinolona", texto:"Reações graves contraindicam teste de provocação.", fonte:ALG_SRC.pp };
+      ev("Todas as fluoroquinolonas", algNomes(fqs) + ". Evitar a classe até avaliação especializada (conduta conservadora).", ALG_SRC.pp);
+    } else if (r === "tardia"){
+      R.fenotipo = { titulo:"Exantema tardio benigno a fluoroquinolona", texto:"É a reação alérgica mais comum (2% a 3% dos tratados). A reatividade cruzada entre fluoroquinolonas para exantema tardio parece baixa (cerca de 10%), e só cerca de 5% recorrem na reexposição.", fonte:ALG_SRC.pp };
+      ev(d.nome + " (fármaco suspeito)", "Evitar até avaliação.", ALG_SRC.pp);
+      av("Outras fluoroquinolonas", "Provocação em 1 ou 2 etapas, sem teste cutâneo, pode confirmar tolerância em reações não anafiláticas (CBS 21).", ALG_SRC.pp);
+    } else {
+      R.fenotipo = { titulo:"Reação imediata a fluoroquinolona", texto:"A maioria das reações imediatas não é mediada por IgE, mas, quando é, a reatividade cruzada entre fluoroquinolonas é de cerca de 50%. Testes cutâneos não são validados.", fonte:ALG_SRC.pp };
+      ev("Todas as fluoroquinolonas", algNomes(fqs) + ". Evitar a classe até avaliação do alergista.", ALG_SRC.pp);
+      if (r === "urticaria") av("Reexposição supervisionada", "Em reações não anafiláticas, a AAAAI sugere provocação em 1 ou 2 etapas para confirmar tolerância (CBS 21).", ALG_SRC.pp);
+    }
+    en("O antibiótico alternativo é decisão do prescritor; registre a alergia e informe a reação descrita.");
+    return R;
+  }
+
+  /* ---------------- Macrolídeos ---------------- */
+  if (d.fam === "macro"){
+    const mac = ALG_DRUGS.filter(x=>x.fam==="macro" && x.id!==d.id).map(x=>x.id);
+    R.fenotipo = { titulo:"Alergia a macrolídeo", texto:"Alergia confirmada a macrolídeos é rara; com avaliação, cerca de 95% dos pacientes voltam a usar macrolídeos com segurança. Por falta de testes validados, a extensão da reatividade cruzada entre macrolídeos é desconhecida.", fonte:ALG_SRC.pp };
+    ev(d.nome + " (fármaco suspeito)", grave ? "Evitar em definitivo." : "Evitar até avaliação.", ALG_SRC.pp);
+    if (grave) ev("Outros macrolídeos", algNomes(mac) + ". Após reação grave, evitar a classe até avaliação especializada (conduta conservadora).", ALG_SRC.pp);
+    else av("Outros macrolídeos", algNomes(mac) + ". Reatividade cruzada desconhecida; em reações não anafiláticas, provocação em 1 ou 2 etapas pode confirmar tolerância (CBS 21).", ALG_SRC.pp);
+    en("O antibiótico alternativo é decisão do prescritor; registre a alergia e informe a reação descrita.");
+    return R;
+  }
+  return R;
+}
+
+function renderAlergia(){
+  const S = algState, d = ALG[S.droga], R = runAlergia();
+  const optGroups = Object.keys(ALG_FAM).map(f=>`<optgroup label="${ALG_FAM[f]}">${ALG_DRUGS.filter(x=>x.fam===f).map(x=>`<option value="${x.id}" ${S.droga===x.id?'selected':''}>${escapeHtml(x.nome)}</option>`).join('')}</optgroup>`).join('');
+  const chk = (key,label)=>`<label class="chk"><input type="checkbox" ${S[key]?'checked':''} onchange="algChk('${key}')"> ${label}</label>`;
+  const item = (x, card, badge, rot)=>`<div class="int-card ${card}">
+      <div class="h"><div><div class="t" style="font-size:15px">${escapeHtml(x.titulo)}</div></div><span class="badge ${badge}" style="text-transform:uppercase">${rot}</span></div>
+      <div class="b"><p style="margin:0">${escapeHtml(x.detalhe)}</p><p class="small muted" style="margin-top:8px">Fonte: ${escapeHtml(x.fonte)}</p></div>
+    </div>`;
+  const ehAntibiotico = d && d.fam !== "aine";
+
+  const resultado = !d
+    ? `<div class="empty" style="padding:32px"><div class="icon">🩺</div><h3>Informe o medicamento que causou a reação</h3><p>Depois descreva a reação para ver o que evitar e as opções mais seguras.</p></div>`
+    : `
+      ${R.alarme ? `<div class="alert danger"><span>🚨</span><div><span class="t">Reação grave relatada.</span> Se houver falta de ar, inchaço de lábios/língua/garganta, tontura ou desmaio, bolhas ou descolamento de pele, ou lesões em boca e olhos, encaminhe imediatamente ao serviço de urgência.</div></div>` : ''}
+      <div class="card"><div class="card-c">
+        <div class="small muted" style="text-transform:uppercase;letter-spacing:.06em">Interpretação</div>
+        <div style="font-size:18px;font-weight:700;margin:4px 0 8px">${escapeHtml(R.fenotipo.titulo)}</div>
+        <p style="margin:0">${escapeHtml(R.fenotipo.texto)}</p>
+        <p class="small muted" style="margin-top:8px">Fonte: ${escapeHtml(R.fenotipo.fonte)}</p>
+      </div></div>
+      ${R.evitar.length ? `<div class="sec-head" style="margin:6px 0 0"><h2 style="font-size:16px">⛔ Evitar</h2></div>${R.evitar.map(x=>item(x,'grave','red','Evitar')).join('')}` : ''}
+      ${R.avaliar.length ? `<div class="sec-head" style="margin:6px 0 0"><h2 style="font-size:16px">⚠️ Só com avaliação médica</h2></div>${R.avaliar.map(x=>item(x,'moderado','yellow','Avaliar')).join('')}` : ''}
+      ${R.opcoes.length ? `<div class="sec-head" style="margin:6px 0 0"><h2 style="font-size:16px">✅ ${ehAntibiotico ? 'Opções que o prescritor pode considerar' : 'Opções mais seguras'}</h2></div>${R.opcoes.map(x=>item(x,'leve','emerald','Opção')).join('')}` : ''}
+      ${R.encaminhar.length ? `<div class="alert info"><span>➡️</span><div><span class="t">Encaminhamento e registro</span><ul style="margin:6px 0 0;padding-left:18px">${R.encaminhar.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul></div></div>` : ''}
+      <button class="btn sm" style="align-self:flex-start" onclick="algCopy()">⧉ Copiar registro</button>`;
+
+  $app.innerHTML = `
+    ${topbar('alergia')}
+    <div class="container wide">
+      <div class="sec-head">
+        <h2>Alergias a medicamentos</h2>
+        <span class="badge purple">${ALG_DRUGS.length} fármacos · ${Object.keys(ALG_FAM).length} classes</span>
+      </div>
+      <div class="alert warn" style="margin-bottom:20px">
+        <span>⚠️</span>
+        <div><span class="t">Ferramenta de apoio à indicação.</span> Baseada no Drug Allergy Practice Parameter 2022 (AAAAI/ACAAI), na classificação EAACI/ENDA e em bulas brasileiras. Não confirma nem descarta alergia: o diagnóstico e os testes de provocação são do alergista. Na dúvida, não indique e encaminhe.</div>
+      </div>
+      <div class="grid grid-2" style="align-items:start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="card-h"><div class="card-t">1. Medicamento que causou a reação</div></div>
+            <div class="card-c">
+              <select onchange="algSet('droga', this.value)">
+                <option value="">Selecione…</option>
+                ${optGroups}
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-t">2. Como foi a reação</div><p class="card-d">Pergunte o que aconteceu e quanto tempo depois da dose</p></div>
+            <div class="card-c" style="display:flex;flex-direction:column;gap:8px">
+              ${ALG_REACOES.map(([v,l])=>`<label class="chk"><input type="radio" name="algReac" ${S.reacao===v?'checked':''} onchange="algSet('reacao','${v}')"> ${l}</label>`).join('')}
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-t">3. Contexto do paciente</div></div>
+            <div class="card-c" style="display:flex;flex-direction:column;gap:10px">
+              ${!d || d.fam==="aine" ? `
+                ${chk('asmaPolipo','Asma, rinossinusite crônica ou pólipos nasais')}
+                ${chk('urticCronica','Urticária crônica')}
+                ${chk('multiplos','Já reagiu a AINEs de grupos diferentes (ex.: AAS e ibuprofeno)')}
+                <div><label>Necessidade atual</label>
+                  <select onchange="algSet('necessidade', this.value)">
+                    <option value="dor" ${S.necessidade==='dor'?'selected':''}>Dor</option>
+                    <option value="inflamacao" ${S.necessidade==='inflamacao'?'selected':''}>Processo inflamatório</option>
+                    <option value="febre" ${S.necessidade==='febre'?'selected':''}>Febre</option>
+                  </select></div>` : ''}
+              ${chk('mais5','A reação aconteceu há mais de 5 anos')}
+            </div>
+          </div>
+          <button class="btn ghost" style="align-self:flex-start" onclick="algReset()">↺ Limpar</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px;position:sticky;top:76px">
+          ${resultado}
+        </div>
+      </div>
+      ${footer()}
+    </div>`;
+}
+window.algSet = function(k,v){ algState[k]=v; const y=window.scrollY; renderAlergia(); window.scrollTo(0,y); };
+window.algChk = function(k){ algState[k]=!algState[k]; const y=window.scrollY; renderAlergia(); window.scrollTo(0,y); };
+window.algReset = function(){ algState = ALG_EMPTY(); renderAlergia(); };
+window.algCopy = function(){
+  const S = algState, d = ALG[S.droga]; if (!d) return;
+  const R = runAlergia();
+  const reac = (ALG_REACOES.find(x=>x[0]===S.reacao)||[])[1];
+  const sn = v => v ? "sim" : "não";
+  const L = [
+    "ALERGIA A MEDICAMENTO — FARMACOMPANHA",
+    "Data/hora: " + new Date().toLocaleString('pt-BR'),
+    "Fármaco suspeito: " + d.nome + " (" + ALG_FAM[d.fam] + ")",
+    "Reação relatada: " + reac + (S.mais5 ? " | há mais de 5 anos" : ""),
+    d.fam === "aine" ? "Contexto: asma/pólipos " + sn(S.asmaPolipo) + " | urticária crônica " + sn(S.urticCronica) + " | reação a AINEs de grupos diferentes " + sn(S.multiplos) + " | necessidade: " + S.necessidade : null,
+    "Interpretação: " + R.fenotipo.titulo,
+    "",
+    "EVITAR:", ...R.evitar.map(x=>"- " + x.titulo + ": " + x.detalhe),
+    R.avaliar.length ? "" : null, R.avaliar.length ? "SÓ COM AVALIAÇÃO MÉDICA:" : null, ...R.avaliar.map(x=>"- " + x.titulo + ": " + x.detalhe),
+    R.opcoes.length ? "" : null, R.opcoes.length ? "OPÇÕES:" : null, ...R.opcoes.map(x=>"- " + x.titulo + ": " + x.detalhe),
+    "", "ENCAMINHAMENTO:", ...R.encaminhar.map(t=>"- " + t),
+    "", "Fontes: " + ALG_SRC.pp + "; " + ALG_SRC.enda + "; bulas Nisulid®, Novalgina® e Celebra®.",
+    "Ferramenta de apoio; não substitui a avaliação do alergista nem o julgamento clínico.",
+  ].filter(x=>x!==null);
+  const txt = L.join("\n");
+  if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast("Registro copiado")); }
+  else { toast("Não foi possível copiar"); }
+};
+
 function render(){
   if (landingCleanup){ landingCleanup(); landingCleanup = null; }
   if (!location.hash) return renderLanding();
@@ -4736,6 +5145,7 @@ function render(){
   if (!hash.startsWith('/avaliacao/')) wizardState = { step:1, data:null, savedAt:null };
   if (hash === '/' || hash === '') return renderHome();
   if (hash === '/triagem') return renderTriagem();
+  if (hash === '/alergias') return renderAlergia();
   if (hash === '/biblioteca') return renderLibrary();
   if (hash === '/matriz') return renderMatrix();
   const m1 = hash.match(/^\/avaliacao\/(.+)$/);
